@@ -7,10 +7,13 @@ Created on Mon Jul 26 14:09:30 2021
 
 import pandas as pd
 import pyiast
+import csv
 import func_iast as fi
 
 df_pi1_co2 = pd.read_csv("PI-1-CO2-Ads-195K.csv")
 df_pi1_n2 = pd.read_csv("PI-1-N2-Ads-195K.csv")
+
+# Fit the isothermal data from experiment
 pi1_co2_isotherm = pyiast.InterpolatorIsotherm(df_pi1_co2,
                                     loading_key="n_PI-1-CO2",
                                     pressure_key="P/P0",
@@ -20,37 +23,31 @@ pi1_n2_isotherm = pyiast.InterpolatorIsotherm(df_pi1_n2,
                                               pressure_key="P/P0",
                                               fill_value=df_pi1_n2['n_PI-1-N2'].max())
 #pyiast.plot_isotherm(pi2_n2_isotherm)
+
 total_pressure = 1  # total pressure (bar)
 i = 0
-p = fi.array_proportion()
+pressure_part = fi.array_proportion() * total_pressure # the pressure of each gas component
 component_loading = fi.array_proportion()
 amf_guess = fi.array_proportion()
-selectivity = fi.array_proportion()
-exception_rf = """Root finding for gas phase mole fractions failed.
-        This is likely because the default guess in pyIAST is not good enough.
-        Try a different starting guess for the gas phase mole fractions by
-        passing an array or list gas_mole_fraction_guess to this function."""
-# partial pressures are now P_total * y
+selectivity = fi.array_proportion() # initial the selectivity array
+
 # Perform IAST calculation
 while i < 9:
-    print("Out"+str(i))
+    print("Out "+str(i))
     try:
-        print(p[i])
-        component_loading[i] = pyiast.iast(total_pressure * p[i], 
+        print(pressure_part[i])
+        component_loading[i] = pyiast.iast(pressure_part[i], 
                                     [pi1_co2_isotherm, pi1_n2_isotherm],
                                     verboseflag=False,
                                     warningoff=True,
                                     adsorbed_mole_fraction_guess= [0.1, 0.9])
-    except Exception as e:
-        if str(e) is exception_rf:
-            print(exception_rf)
-        else:
-            print(e)
+    except:
+        print("change adsorbed_mole_fraction_guess")
         j = 1
         while j < 9:
-            print(j)
+            print("Inner " + str(j))
             try:
-                component_loading[i] = pyiast.iast(total_pressure * p[i], 
+                component_loading[i] = pyiast.iast(pressure_part[i], 
                                     [pi1_co2_isotherm, pi1_n2_isotherm],
                                     verboseflag=False,
                                     warningoff=True,
@@ -63,20 +60,31 @@ while i < 9:
     finally:
         i = i+1
 
-# Calculate selectivity of each component
+# Calculate selectivity of each proportion
 i = 0
 j = 0
 while i < 9:
     try:
-        selectivity[i, j] = p[i, j]/p[i, j+1]
+        selectivity[i, j] = pressure_part[i, j]/pressure_part[i, j+1]
         j = j+1
-        selectivity[i, j] = fi.cal_selectivity(component_loading[i], p[i])
+        selectivity[i, j] = fi.cal_selectivity(component_loading[i], pressure_part[i])
     except Exception as e:
         print(e)
         pass
     finally:
         i = i+1
         j = 0
-        
-print(selectivity)
+
+# Write selectivity to csv file
+headers = ['CO2/N2', 'Selectivity']
+try:
+    with open('selectivity_PI1.csv', 'w') as f:
+            f_csv = csv.writer(f)
+            f_csv.writerow(headers)
+            f_csv.writerows(selectivity)
+except Exception as e:
+    print(e)
+
+
+    
 
