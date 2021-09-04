@@ -41,3 +41,18 @@ def array_proportion():
         j = 0
     
     return a
+
+def array_proportion_n(row_num):
+
+    length = row_num*2
+    a =  np.arange(length).reshape(row_num,2).astype(np.float64)
+    i = 0
+    j = 0
+    while i < row_num:
+        a[i,j] = 0.1
+        j = j+1
+        a[i,j] = 0.1
+        i = i+1
+        j = 0
+    
+    return a
